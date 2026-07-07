@@ -1,77 +1,71 @@
 import streamlit as st
 import os
-import tempfile
 import glob
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS # <-- CAMBIAMOS A FAISS
+from langchain_community.vectorstores import FAISS
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 
 # ==========================================
-# 1. CONFIGURACIÓN DE LA INTERFAZ
+# 1. CONFIGURACIÓN DE LA PÁGINA
 # ==========================================
-st.set_page_config(page_title="Agrobot Plátano - Tesis", page_icon="🍌", layout="wide")
-
-# ==========================================
-# 2. CARGA DE MODELOS (Caché para velocidad)
-# ==========================================
-@st.cache_resource
-def cargar_modelo_embeddings():
-    return HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-
-embeddings = cargar_modelo_embeddings()
-
-# Inicializamos la base de datos (Vacía al principio)
-if "vectorstore" not in st.session_state:
-    st.session_state.vectorstore = None
-    st.session_state.documentos_cargados = False
+st.set_page_config(page_title="Agrobot Plátano", page_icon="🍌", layout="centered")
 
 # ==========================================
-# 3. BARRA LATERAL (Configuración y Entrenamiento)
+# 2. CARGA AUTOMÁTICA DEL CONOCIMIENTO (BACKEND)
 # ==========================================
-st.sidebar.title("⚙️ Panel de Control")
+# @st.cache_resource hace que esto solo se ejecute una vez cuando el servidor arranca.
+@st.cache_resource(show_spinner="Iniciando el cerebro del Agrobot...")
+def preparar_base_de_conocimiento():
+    carpeta_docs = "documentos"
+    
+    # Si la carpeta no existe, no hay problema, devolvemos None
+    if not os.path.exists(carpeta_docs):
+        return None
 
-api_key = st.sidebar.text_input("Ingresa tu Groq API Key:", type="password")
-st.sidebar.markdown("[👉 Consigue tu API Key Gratis aquí](https://console.groq.com/keys)")
-st.sidebar.markdown("---")
+    # Buscamos todos los PDFs en la carpeta
+    archivos_pdf = glob.glob(f"{carpeta_docs}/*.pdf")
+    if not archivos_pdf:
+        return None
 
-st.sidebar.subheader("📚 Entrenar al Chatbot")
-st.sidebar.caption("Sube manuales sobre nuevas enfermedades, riegos, etc.")
-archivos_pdf = st.sidebar.file_uploader("Sube documentos PDF", type="pdf", accept_multiple_files=True)
+    docs = []
+    for ruta in archivos_pdf:
+        try:
+            loader = PyPDFLoader(ruta)
+            docs.extend(loader.load())
+        except Exception as e:
+            print(f"Error cargando {ruta}: {e}")
 
-if st.sidebar.button("🧠 Procesar y Aprender"):
-    if archivos_pdf:
-        with st.spinner("Estudiando los documentos..."):
-            for archivo in archivos_pdf:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-                    tmp_file.write(archivo.read())
-                    tmp_path = tmp_file.name
+    if not docs:
+        return None
 
-                loader = PyPDFLoader(tmp_path)
-                docs = loader.load()
-                text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-                splits = text_splitter.split_documents(docs)
+    # Dividimos y procesamos el texto
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    splits = text_splitter.split_documents(docs)
 
-                # Inyectar a FAISS (Manejo sin errores en la nube)
-                if st.session_state.vectorstore is None:
-                    st.session_state.vectorstore = FAISS.from_documents(splits, embeddings)
-                else:
-                    st.session_state.vectorstore.add_documents(splits)
-                    
-                os.remove(tmp_path) 
-                
-            st.session_state.documentos_cargados = True
-            st.sidebar.success("¡Información procesada y memorizada!")
-    else:
-        st.sidebar.warning("Selecciona al menos un PDF primero.")
+    # Creamos la base de datos vectorial FAISS en memoria
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    vectorstore = FAISS.from_documents(splits, embeddings)
+    
+    return vectorstore
+
+# Ejecutamos la carga en el backend
+vectorstore = preparar_base_de_conocimiento()
 
 # ==========================================
-# 4. LÓGICA PRINCIPAL DEL CHATBOT
+# 3. INTERFAZ DEL CHAT (FRONTEND)
 # ==========================================
 st.title("🍌 Agrobot - Experto en Cultivo de Plátano")
-st.markdown("Soy tu ingeniero agrónomo de bolsillo. Baso mis respuestas en manuales técnicos, pero si no encuentro el dato exacto, te daré mis mejores recomendaciones profesionales.")
+st.markdown("¡Hola! Soy tu ingeniero agrónomo virtual. Estoy entrenado con los manuales oficiales de cultivo. ¿En qué te puedo ayudar hoy?")
+
+# Intentamos obtener la API Key oculta de los secretos de Streamlit
+try:
+    api_key = st.secrets["GROQ_API_KEY"]
+except KeyError:
+    st.error("⚠️ Error de configuración: No se encontró la API Key en los secretos del servidor.")
+    st.stop()
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -80,25 +74,23 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if prompt := st.chat_input("Ej: ¿Qué recomiendas si las hojas se ponen amarillas?"):
+if prompt := st.chat_input("Ej: ¿Cómo controlo el picudo negro?"):
     
-    if not api_key:
-        st.error("⚠️ Para que el bot funcione en la nube, ingresa tu Groq API Key en la barra lateral.")
-        st.stop()
-
+    # 1. Mostrar mensaje del usuario
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
+    # 2. Generar respuesta
     with st.chat_message("assistant"):
-        with st.spinner("Consultando manuales y analizando..."):
+        with st.spinner("Analizando manuales técnicos..."):
             try:
                 contexto = ""
                 docs_relevantes = []
                 
-                # Buscar en la memoria FAISS si ya cargamos documentos
-                if st.session_state.documentos_cargados and st.session_state.vectorstore is not None:
-                    retriever = st.session_state.vectorstore.as_retriever(search_kwargs={"k": 3})
+                # Si hay documentos cargados en el backend, buscamos en ellos
+                if vectorstore is not None:
+                    retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
                     docs_relevantes = retriever.invoke(prompt)
                     contexto = "\n\n".join(doc.page_content for doc in docs_relevantes)
 
@@ -111,31 +103,32 @@ if prompt := st.chat_input("Ej: ¿Qué recomiendas si las hojas se ponen amarill
                 prompt_template = ChatPromptTemplate.from_messages([
                     ("system", """Eres un ingeniero agrónomo experto en el cultivo de plátano.
                     
-                    Contexto técnico extraído de manuales:
+                    Contexto técnico extraído de manuales oficiales:
                     {context}
 
                     REGLAS ESTRICTAS PARA RESPONDER:
-                    1. RESPONDE DIRECTAMENTE A LA PREGUNTA DEL USUARIO. Tienes PROHIBIDO saludar, decir "¡Bienvenido!" o hacer preguntas de cierre como "¿En qué puedo ayudarte?".
-                    2. Prioriza SIEMPRE la información del Contexto para dar tu respuesta técnica.
-                    3. Si la respuesta exacta no está en el Contexto, NO digas "no sé". Utiliza tu conocimiento experto general para dar la mejor recomendación posible.
+                    1. RESPONDE DIRECTAMENTE A LA PREGUNTA DEL USUARIO. Tienes PROHIBIDO saludar, presentarte o hacer preguntas de cierre.
+                    2. Prioriza SIEMPRE la información del Contexto.
+                    3. Si la respuesta exacta no está en el Contexto, utiliza tu conocimiento experto general para dar la mejor recomendación posible (NUNCA digas "no sé" o "no tengo información").
                     4. Actúa 100% como un profesional, ve directo al grano.
                     """),
                     ("user", "{question}")
                 ])
                 
                 mensaje = prompt_template.format_messages(context=contexto, question=prompt)
-
                 respuesta_ia = llm.invoke(mensaje)
                 texto_respuesta = respuesta_ia.content
 
                 st.markdown(texto_respuesta)
                 
+                # Fuentes ocultas en un desplegable (muy profesional para la tesis)
                 if docs_relevantes:
-                    with st.expander("📚 Fuentes técnicas consultadas (Documentos)"):
+                    with st.expander("📚 Fuentes técnicas consultadas (Documentos internos)"):
                         for i, doc in enumerate(docs_relevantes):
-                            st.write(f"**Fragmento {i+1}:** {doc.page_content[:250]}...")
+                            nombre_archivo = os.path.basename(doc.metadata.get('source', 'Desconocido'))
+                            st.caption(f"**De: {nombre_archivo}**\n{doc.page_content[:150]}...")
 
                 st.session_state.messages.append({"role": "assistant", "content": texto_respuesta})
                 
             except Exception as e:
-                st.error(f"Error de conexión con la Nube: {str(e)}")
+                st.error(f"Error interno del servidor: {str(e)}")
