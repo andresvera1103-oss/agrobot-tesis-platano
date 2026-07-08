@@ -98,7 +98,15 @@ with col1:
     prompt_texto = st.chat_input("Escribe tu pregunta...")
 with col2:
     # Micrófono integrado usando la API del navegador
-    prompt_voz = speech_to_text(language='es-ES', use_container_width=True, just_once=True, key='STT')
+    # Personalizamos los botones con emojis
+    prompt_voz = speech_to_text(
+        language='es-ES', 
+        use_container_width=True, 
+        just_once=True, 
+        key='STT',
+        start_prompt="🎙️", # Botón para empezar a grabar
+        stop_prompt="🛑",  # Botón para detener la grabación
+    )
 
 # Determinamos si el usuario usó voz o texto
 prompt = prompt_texto or prompt_voz
