@@ -5,7 +5,9 @@ langchain-community
 langchain-ollama
 pypdf
 sentence-transformers
-
 streamlit
 langchain-groq
 faiss-cpu
+
+
+streamlit-mic-recorder
