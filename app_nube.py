@@ -47,47 +47,29 @@ def guardar_interaccion(pregunta, respuesta):
 # ==========================================
 # 2. CONFIGURACIÓN E INTERFAZ
 # ==========================================
+# Volvemos a layout="centered" para que todo se vea bien proporcionado
 st.set_page_config(page_title="Agrobot Plátano", page_icon="🍌", layout="centered")
 
-# --- CSS PERSONALIZADO (Arreglo visual y fijación al fondo) ---
+# CSS mínimo solo para alinear el botón de audio con la caja de chat nativa
 st.markdown("""
 <style>
-    /* Ocultar el espacio en blanco extra arriba */
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 120px; /* Dejar espacio para la barra inferior */
-    }
-    
-    /* Contenedor fijo en la parte inferior para los inputs */
-    .fixed-bottom-container {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background-color: var(--background-color);
-        padding: 1rem 2rem;
-        z-index: 100;
-        display: flex;
-        justify-content: center;
-        border-top: 1px solid rgba(255,255,255,0.1);
-    }
-    
-    /* Centrar y limitar el ancho del input para que coincida con el chat */
-    .input-wrapper {
-        max-width: 800px;
-        width: 100%;
-        display: flex;
-        gap: 10px;
-        align-items: center; /* Alineación vertical perfecta */
-    }
-    
-    /* Ajustes específicos para el botón del micrófono */
+    /* Ajuste fino para quitar márgenes extra del botón del micrófono */
     .stAudio {
         margin-top: 0px !important;
         margin-bottom: 0px !important;
     }
-    div[data-testid="stVerticalBlock"] > div:has(button) {
+    /* Alinear verticalmente el contenido de las columnas */
+    [data-testid="stVerticalBlock"] > div:has(button) {
          margin-bottom: 0 !important;
+         display: flex;
+         align-items: center;
+         justify-content: center;
+    }
+    
+    /* Asegurarnos que el microfono tenga la misma altura visual */
+    button[title="Record audio"] {
+        height: 42px; /* Altura similar al chat_input */
+        width: 100%;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -135,16 +117,15 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# --- RF-01: Entrada Multimodal (Texto o Voz) Fija al Fondo ---
-# Usamos un contenedor que controlamos con el CSS personalizado
-st.markdown('<div class="fixed-bottom-container"><div class="input-wrapper">', unsafe_allow_html=True)
-
-# Contenedor especial de Streamlit para alinear lado a lado sin problemas
+# --- ZONA DE ENTRADA (Manejada por Streamlit para quedarse abajo) ---
+# Usamos un contenedor vacío al fondo que Streamlit maneja automáticamente
 input_container = st.container()
+
 with input_container:
-    col1, col2 = st.columns([0.85, 0.15], gap="small", vertical_alignment="center")
+    col1, col2 = st.columns([0.88, 0.12], vertical_alignment="bottom")
     
     with col1:
+        # st.chat_input tiene la lógica nativa para quedarse al fondo
         prompt_texto = st.chat_input("Escribe tu pregunta...")
         
     with col2:
@@ -156,8 +137,6 @@ with input_container:
             start_prompt="🎙️",
             stop_prompt="🛑",
         )
-
-st.markdown('</div></div>', unsafe_allow_html=True)
 
 # Determinamos si el usuario usó voz o texto
 prompt = prompt_texto or prompt_voz
