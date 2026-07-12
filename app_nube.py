@@ -77,18 +77,39 @@ except KeyError:
 # Título exacto como en la imagen
 st.title("🍌 Agrobot - Plátano")
 
-# Panel lateral para la consulta por voz (Para no dañar el diseño principal)
-with st.sidebar:
-    st.header("🎙️ Consulta por voz")
-    st.caption("Presiona para hablar tu pregunta")
-    prompt_voz = speech_to_text(
-        language='es-ES', 
-        use_container_width=True, 
-        just_once=True, 
-        key='STT',
-        start_prompt="🎤 Iniciar grabación",
-        stop_prompt="🛑 Detener",
-    )
+# CSS Mágico para flotar el micrófono dentro de la barra de chat (Estilo Gemini)
+st.markdown(
+    """
+    <style>
+    /* Selector avanzado para encontrar el botón del micrófono y hacerlo flotar */
+    div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
+        position: fixed;
+        bottom: 30px; /* Alineado verticalmente con el centro de la barra */
+        right: 65px; /* Colocado justo a la izquierda del botón de enviar (Avión de papel) en móviles */
+        z-index: 999;
+        width: 45px !important; /* Lo hace cuadrado y compacto */
+    }
+    
+    /* Ajuste preciso para laptops y pantallas grandes (Layout Centrado de Streamlit) */
+    @media (min-width: 768px) {
+        div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
+            right: calc(50% - 310px); /* Lo mantiene anclado dentro de la caja de chat que mide 730px */
+        }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Renderizamos el micrófono compacto (el CSS de arriba lo moverá visualmente a la barra inferior)
+prompt_voz = speech_to_text(
+    language='es-ES', 
+    use_container_width=False, 
+    just_once=True, 
+    key='STT',
+    start_prompt="🎤", # Quitamos el texto para que quede como un icono minimalista
+    stop_prompt="🛑",
+)
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -97,7 +118,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# --- ZONA DE ENTRADA NATIVA (Idéntica a la imagen) ---
+# --- ZONA DE ENTRADA NATIVA (Idéntica a la imagen, el micrófono flotará sobre ella) ---
 prompt_texto = st.chat_input("Escribe tu duda sobre el cultivo...")
 
 # Determinamos si el usuario usó voz o texto
