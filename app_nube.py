@@ -84,8 +84,8 @@ st.markdown(
     /* Selector avanzado para encontrar el botón del micrófono y hacerlo flotar */
     div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
         position: fixed;
-        bottom: 30px; /* Alineado verticalmente con el centro de la barra */
-        right: 65px; /* Colocado justo a la izquierda del botón de enviar (Avión de papel) en móviles */
+        bottom: 23px; /* Alineación vertical exacta con la barra de texto */
+        right: 15px; /* En móviles, se pega a la derecha de la pantalla */
         z-index: 999;
         width: 45px !important; /* Lo hace cuadrado y compacto */
     }
@@ -93,7 +93,9 @@ st.markdown(
     /* Ajuste preciso para laptops y pantallas grandes (Layout Centrado de Streamlit) */
     @media (min-width: 768px) {
         div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-            right: calc(50% - 310px); /* Lo mantiene anclado dentro de la caja de chat que mide 730px */
+            /* La caja de chat mide aprox 730px. 365px es el borde. 
+               Usar 390px lo coloca perfectamente afuerita, al lado derecho de la flecha */
+            right: calc(50% - 390px); 
         }
     }
     </style>
