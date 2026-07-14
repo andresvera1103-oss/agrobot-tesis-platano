@@ -77,25 +77,60 @@ except KeyError:
 # Título exacto como en la imagen
 st.title("🍌 Agrobot - Plátano")
 
-# CSS Mágico para flotar el micrófono dentro de la barra de chat (Estilo Gemini)
+# CSS Mágico para transformar la barra de chat al estilo Gemini
 st.markdown(
     """
     <style>
-    /* Selector avanzado para encontrar el botón del micrófono y hacerlo flotar */
-    div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-        position: fixed;
-        bottom: 23px; /* Alineación vertical exacta con la barra de texto */
-        right: 15px; /* En móviles, se pega a la derecha de la pantalla */
-        z-index: 999;
-        width: 45px !important; /* Lo hace cuadrado y compacto */
+    /* 1. Transformar la caja de texto en una "píldora" */
+    div[data-testid="stChatInput"] {
+        padding-bottom: 20px;
+    }
+    div[data-testid="stChatInput"] textarea {
+        border-radius: 30px !important; /* Forma de píldora */
+        padding-right: 90px !important; /* Espacio reservado para el micro y la flecha */
+        padding-left: 20px !important;
     }
     
-    /* Ajuste preciso para laptops y pantallas grandes (Layout Centrado de Streamlit) */
+    /* 2. Transformar el botón de enviar nativo en un círculo blanco con flecha negra */
+    div[data-testid="stChatInput"] button {
+        background-color: white !important;
+        border-radius: 50% !important;
+        height: 38px !important;
+        width: 38px !important;
+        padding: 0 !important;
+        margin-right: 8px !important;
+        margin-bottom: 6px !important;
+        transition: transform 0.2s;
+    }
+    div[data-testid="stChatInput"] button:hover {
+        transform: scale(1.05); /* Pequeña animación al pasar el mouse */
+    }
+    div[data-testid="stChatInput"] button svg {
+        fill: black !important;
+        color: black !important;
+    }
+
+    /* 3. Posicionar el micrófono ADENTRO de la barra, al lado izquierdo del botón blanco */
+    div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
+        position: fixed;
+        bottom: 33px; /* Altura exacta para que quede centrado dentro de la barra */
+        z-index: 999;
+        width: 40px !important; 
+        height: 40px !important;
+    }
+    
+    /* Ajuste para Móviles */
+    @media (max-width: 767px) {
+        div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
+            right: 75px; /* Empujado hacia adentro de la pantalla */
+        }
+    }
+    
+    /* Ajuste para Laptops/Monitores (Layout Centrado de Streamlit) */
     @media (min-width: 768px) {
         div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-            /* La caja de chat mide aprox 730px. 365px es el borde. 
-               Usar 390px lo coloca perfectamente afuerita, al lado derecho de la flecha */
-            right: calc(50% - 390px); 
+            /* Cálculo matemático para mantenerlo siempre dentro de la barra en PC */
+            right: calc(50vw - 285px); 
         }
     }
     </style>
@@ -103,13 +138,13 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Renderizamos el micrófono compacto (el CSS de arriba lo moverá visualmente a la barra inferior)
+# Renderizamos el micrófono compacto (el CSS de arriba lo moverá visualmente adentro de la barra)
 prompt_voz = speech_to_text(
     language='es-ES', 
     use_container_width=False, 
     just_once=True, 
     key='STT',
-    start_prompt="🎤", # Quitamos el texto para que quede como un icono minimalista
+    start_prompt="🎤", 
     stop_prompt="🛑",
 )
 
