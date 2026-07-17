@@ -37,6 +37,11 @@ def guardar_interaccion(pregunta, respuesta):
               (pregunta.lower().strip(), respuesta))
     conn.commit()
 
+def cargar_historial():
+    """Recupera el historial completo de la base de datos para mostrarlo en el menú lateral."""
+    c.execute("SELECT pregunta, respuesta FROM logs_auditoria ORDER BY id DESC")
+    return c.fetchall()
+
 # ==========================================
 # 2. CONFIGURACIÓN E INTERFAZ
 # ==========================================
@@ -72,100 +77,63 @@ except KeyError:
     api_key = None 
 
 # ==========================================
-# 3. INTERFAZ GRÁFICA PRINCIPAL Y CSS
+# 3. INTERFAZ GRÁFICA PRINCIPAL
 # ==========================================
 st.title("🍌 Agrobot - Plátano")
 
 # --- BARRA LATERAL: HISTORIAL DE CHAT ---
 with st.sidebar:
     st.header("🕒 Historial de Consultas")
-    st.caption("Haz clic en una conversación para verla completa en la pantalla principal.")
+    st.caption("Tus conversaciones anteriores guardadas en la memoria local.")
     
-    if st.button("➕ Nueva Consulta", type="primary", use_container_width=True):
+    if st.button("➕ Nueva Consulta (Limpiar Pantalla)", type="primary", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
         
     st.divider()
     
-    # Cargar y mostrar historial como botones
-    c.execute("SELECT pregunta, respuesta FROM logs_auditoria ORDER BY id DESC")
-    historial_db = c.fetchall()
+    # Cargar y mostrar historial como botones desplegables
+    historial_db = cargar_historial()
     
     for i, (preg, resp) in enumerate(historial_db):
         titulo = preg[:30] + "..." if len(preg) > 30 else preg
         
-        # Si presiona el botón, cargamos esa charla en la pantalla principal
-        if st.button(f"🗣️ {titulo}", key=f"hist_{i}", use_container_width=True):
-            st.session_state.messages = [
-                {"role": "user", "content": preg},
-                {"role": "assistant", "content": resp}
-            ]
-
-# --- CSS PARA EL DISEÑO NORMAL Y MICRÓFONO CUADRADO ---
-st.markdown(
-    """
-    <style>
-    /* 1. Barra normal de Streamlit, pero dejamos un "hueco" a la derecha para el microfono */
-    div[data-testid="stChatInput"] {
-        padding-right: 70px !important; 
-    }
-    
-    /* 2. Micrófono CUADRADO, alineado al centro de la barra */
-    div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-        position: fixed !important;
-        bottom: 38px !important; /* <--- AQUÍ ESTÁ LA MAGIA: Subimos el botón para alinearlo perfectamente */
-        z-index: 99999 !important;
-        width: 42px !important; 
-        height: 42px !important;
-        background-color: #2b2c36 !important; /* Fondo gris cuadrado */
-        border: 1px solid #4a4b59 !important; /* Borde sutil estándar */
-        border-radius: 8px !important; /* CUADRADO con esquinas suaves (estilo web moderno) */
-        overflow: hidden !important;
-    }
-
-    /* Fondo transparente interno para el iframe del botón */
-    div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) iframe {
-        background-color: transparent !important;
-    }
-
-    /* Ajuste de posición Horizontal para Móviles */
-    @media (max-width: 767px) {
-        div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-            right: 20px !important; /* Metido justo en el hueco derecho de la pantalla */
-        }
-    }
-    
-    /* Ajuste de posición Horizontal para Computadoras (Layout centrado) */
-    @media (min-width: 768px) {
-        div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-            right: calc(50vw - 365px + 16px) !important; /* Matemáticamente en el hueco derecho de PC */
-        }
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-# Renderizamos el micrófono (el CSS lo volverá cuadrado y lo ubicará a la derecha)
-prompt_voz = speech_to_text(
-    language='es-ES', 
-    use_container_width=False, 
-    just_once=True, 
-    key='STT',
-    start_prompt="🎤", 
-    stop_prompt="🛑",
-)
+        with st.expander(f"👤 {titulo}"):
+            st.markdown(f"**Tú:** {preg}")
+            st.markdown(f"**Bot:** {resp}")
+            
+            if st.button("Traer al chat principal", key=f"btn_hist_{i}"):
+                st.session_state.messages = [
+                    {"role": "user", "content": preg},
+                    {"role": "assistant", "content": resp}
+                ]
+                st.rerun()
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# Imprimimos los mensajes en la pantalla principal
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# --- ZONA DE ENTRADA NATIVA ---
-prompt_texto = st.chat_input("Escribe tu duda sobre el cultivo...")
+# --- PANEL DE VOZ NATIVO (100% estable y elegante) ---
+st.write("") # Pequeño espacio visual
+col1, col2, col3 = st.columns([1, 2, 1]) # Creamos 3 columnas para centrar el botón
+with col2:
+    prompt_voz = speech_to_text(
+        language='es-ES', 
+        use_container_width=True, 
+        just_once=True, 
+        key='STT',
+        start_prompt="🎙️ Toca aquí para hablar", 
+        stop_prompt="🛑 Detener grabación",
+    )
 
+# --- ZONA DE ENTRADA DE TEXTO ---
+prompt_texto = st.chat_input("O escribe tu duda sobre el cultivo...")
+
+# Determinamos si el usuario usó voz o texto
 prompt = prompt_texto or prompt_voz
 
 if prompt:
