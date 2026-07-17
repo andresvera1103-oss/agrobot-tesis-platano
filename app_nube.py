@@ -10,7 +10,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
-from streamlit_mic_recorder import speech_to_text 
+from streamlit_mic_recorder import speech_to_text # Librería para voz (RF-01)
 
 # ==========================================
 # 1. BASE DE DATOS SQLITE (RF-07 y RNF-01)
@@ -81,47 +81,43 @@ with st.sidebar:
     st.header("🕒 Historial de Consultas")
     st.caption("Haz clic en una conversación para verla completa en la pantalla principal.")
     
-    # Botón para limpiar la pantalla y empezar de cero
     if st.button("➕ Nueva Consulta", type="primary", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
         
     st.divider()
     
-    # Extraemos las preguntas de la base de datos
+    # Cargar y mostrar historial como botones
     c.execute("SELECT pregunta, respuesta FROM logs_auditoria ORDER BY id DESC")
     historial_db = c.fetchall()
     
-    # Creamos un botón por cada consulta pasada
     for i, (preg, resp) in enumerate(historial_db):
         titulo = preg[:30] + "..." if len(preg) > 30 else preg
         
-        # Si el usuario hace clic en un botón del historial...
+        # Si presiona el botón, cargamos esa charla en la pantalla principal
         if st.button(f"🗣️ {titulo}", key=f"hist_{i}", use_container_width=True):
-            # ...cargamos ESA conversación específica en el centro de la pantalla
             st.session_state.messages = [
                 {"role": "user", "content": preg},
                 {"role": "assistant", "content": resp}
             ]
 
-# CSS Mágico para transformar la barra de chat al estilo Gemini
+# --- CSS MÁGICO PARA EL DISEÑO DEFINITIVO ---
 st.markdown(
     """
     <style>
-    /* 1. Transformar la caja de texto en una "píldora" */
+    /* 1. Achicar la barra de texto para dejar un "hueco" a la derecha */
     div[data-testid="stChatInput"] {
-        padding-bottom: 20px;
+        padding-bottom: 20px !important;
+        padding-right: 75px !important; /* Espacio reservado para el micrófono */
     }
     div[data-testid="stChatInput"] textarea {
         border-radius: 30px !important; 
-        padding-right: 100px !important; /* Espacio grande para el micro y la flecha */
         padding-left: 20px !important;
-        background-color: transparent !important;
     }
     
-    /* 2. Transformar el botón de enviar nativo en un círculo azul con flecha blanca */
+    /* 2. Botón enviar nativo (Círculo azul con flecha blanca) */
     div[data-testid="stChatInput"] button {
-        background-color: #1a73e8 !important; /* Color azul estilo Gemini/Google */
+        background-color: #1a73e8 !important; 
         border-radius: 50% !important;
         height: 38px !important;
         width: 38px !important;
@@ -138,30 +134,36 @@ st.markdown(
         color: white !important;
     }
 
-    /* 3. Posicionar el micrófono ADENTRO de la barra, a la izquierda del botón azul */
+    /* 3. EL MICRÓFONO POR FUERA DE LA BARRA (Lado Derecho) */
     div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-        position: fixed;
-        bottom: 42px; /* <-- ¡AUMENTAMOS ESTO! Sube el micrófono al centro de la barra */
-        z-index: 999;
-        width: 38px !important; 
-        height: 38px !important;
-        border-radius: 50% !important; /* <-- ¡MAGIA! Corta las esquinas cuadradas feas */
-        overflow: hidden !important; /* <-- Desaparece el fondo oscuro original */
-        background-color: transparent !important;
-        box-shadow: none !important;
+        position: fixed !important;
+        bottom: 26px !important; /* Alineado perfectamente a la altura de la barra */
+        z-index: 99999 !important;
+        width: 42px !important; 
+        height: 42px !important;
+        /* Darle aspecto de botón propio flotante */
+        background-color: #2b2c36 !important; /* Fondo gris oscuro */
+        border: 1px solid #4a4b59 !important; /* Borde muy sutil */
+        border-radius: 50% !important; /* 100% redondo */
+        overflow: hidden !important;
     }
     
-    /* Ajuste responsivo para Móviles */
+    /* Transparencia interna del componente de micrófono */
+    div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) iframe {
+        background-color: transparent !important;
+    }
+    
+    /* Ajuste en Celulares */
     @media (max-width: 767px) {
         div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-            right: 68px; /* Empujado justo a la izquierda del botón de enviar */
+            right: 25px !important; /* Exactamente en el hueco derecho */
         }
     }
     
-    /* Ajuste para Laptops/Monitores (Layout Centrado de Streamlit) */
+    /* Ajuste en Computadoras */
     @media (min-width: 768px) {
         div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-            right: calc(50vw - 295px); /* Mantiene el micro siempre a la izquierda de la flecha azul */
+            right: calc(50vw - 365px + 16px) !important; /* Matemáticamente en el hueco derecho del monitor */
         }
     }
     </style>
@@ -169,7 +171,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Renderizamos el micrófono flotante
+# Renderizamos el micrófono (ahora vive afuera, a la derecha)
 prompt_voz = speech_to_text(
     language='es-ES', 
     use_container_width=False, 
@@ -179,13 +181,9 @@ prompt_voz = speech_to_text(
     stop_prompt="🛑",
 )
 
-# ==========================================
-# CARGA DE HISTORIAL PERSISTENTE
-# ==========================================
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Mostrar los mensajes en pantalla
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
@@ -193,7 +191,6 @@ for message in st.session_state.messages:
 # --- ZONA DE ENTRADA NATIVA ---
 prompt_texto = st.chat_input("Escribe tu duda sobre el cultivo...")
 
-# Determinamos si el usuario usó voz o texto
 prompt = prompt_texto or prompt_voz
 
 if prompt:
@@ -205,7 +202,7 @@ if prompt:
         respuesta_cache = buscar_en_cache(prompt)
         
         if respuesta_cache:
-            # Respuesta rápida offline
+            st.success("⚡ Respuesta recuperada desde caché local (Modo Offline)")
             st.markdown(respuesta_cache)
             st.session_state.messages.append({"role": "assistant", "content": respuesta_cache})
             
@@ -248,7 +245,6 @@ if prompt:
 
                     st.markdown(respuesta_ia)
                     
-                    # Guardamos la nueva interacción en el historial continuo
                     guardar_interaccion(prompt, respuesta_ia)
                     st.session_state.messages.append({"role": "assistant", "content": respuesta_ia})
                     
