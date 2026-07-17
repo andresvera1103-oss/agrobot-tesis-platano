@@ -103,68 +103,62 @@ with st.sidebar:
 st.markdown(
     """
     <style>
-    /* 1. Transformar la caja de texto en una píldora */
-    div[data-testid="stChatInput"] {
-        padding-bottom: 20px !important;
-    }
-    div[data-testid="stChatInput"] textarea {
-        border-radius: 30px !important; 
-        padding-right: 90px !important; /* Hueco reservado para iconos */
-        padding-left: 20px !important;
-    }
-    
-    /* 2. Botón de enviar (Círculo azul) */
-    div[data-testid="stChatInput"] button {
-        background-color: #1a73e8 !important; 
-        border-radius: 50% !important;
-        height: 38px !important;
-        width: 38px !important;
-        padding: 0 !important;
-        margin-right: 8px !important;
-        margin-bottom: 6px !important;
-        transition: transform 0.2s;
-    }
-    div[data-testid="stChatInput"] button:hover {
-        transform: scale(1.05); 
-    }
-    div[data-testid="stChatInput"] button svg {
-        fill: white !important;
-        color: white !important;
-    }
 
-    /* 3. EL HACK DEFINITIVO PARA EL MICRÓFONO */
-    div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-        position: fixed !important;
-        bottom: 50px !important; /* <--- ELEVACIÓN FORZADA AL CENTRO DE LA BARRA */
-        z-index: 99999 !important;
-        width: 35px !important; 
-        height: 35px !important;
-        background-color: transparent !important; /* <--- ELIMINA EL FONDO FEO */
-        border: none !important;
-        box-shadow: none !important;
-        border-radius: 50% !important;
-        overflow: hidden !important;
-    }
-    
-    /* Forzar transparencia interna del componente */
-    div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) iframe {
-        background-color: transparent !important;
-    }
-    
-    /* Ajuste en Celulares */
-    @media (max-width: 767px) {
-        div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-            right: 65px !important; /* Justo al lado de la flecha azul */
-        }
-    }
-    
-    /* Ajuste en Computadoras */
-    @media (min-width: 768px) {
-        div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-            right: calc(50vw - 295px) !important; /* Anclado dentro de la caja de 730px */
-        }
-    }
-    </style>
+/* Caja */
+
+div[data-testid="stTextInput"] input{
+
+    border-radius:30px !important;
+
+    height:54px !important;
+
+    padding-left:18px !important;
+
+    padding-right:80px !important;
+
+}
+
+/* Botón enviar */
+
+button[kind="secondary"]{
+
+    border-radius:50% !important;
+
+    width:46px !important;
+
+    height:46px !important;
+
+    background:#1a73e8 !important;
+
+    color:white !important;
+
+    border:none !important;
+
+}
+
+/* Micrófono */
+
+div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]){
+
+    position:absolute !important;
+
+    right:72px !important;
+
+    margin-top:-52px !important;
+
+    width:35px !important;
+
+    height:35px !important;
+
+    background:transparent !important;
+
+    box-shadow:none !important;
+
+    border:none !important;
+
+}
+
+</style>
     """,
     unsafe_allow_html=True
 )
@@ -192,7 +186,34 @@ for message in st.session_state.messages:
 # --- ZONA DE ENTRADA NATIVA ---
 prompt_texto = st.chat_input("Escribe tu duda sobre el cultivo...")
 
-prompt = prompt_texto or prompt_voz
+# ==========================
+# BARRA PERSONALIZADA
+# ==========================
+
+col1, col2, col3 = st.columns([12,1,1])
+
+with col1:
+    prompt_texto = st.text_input(
+        "",
+        placeholder="Escribe tu duda sobre el cultivo...",
+        key="texto_usuario",
+        label_visibility="collapsed"
+    )
+
+with col2:
+    st.write("")
+
+with col3:
+    enviar = st.button("⬆️", use_container_width=True)
+
+prompt = prompt_voz
+
+if prompt_texto.strip():
+    prompt = prompt_texto
+
+if enviar and not prompt:
+    st.warning("Escribe una consulta.")
+    st.stop()
 
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
