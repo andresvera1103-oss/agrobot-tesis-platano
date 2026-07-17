@@ -10,7 +10,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
-from streamlit_mic_recorder import speech_to_text 
+from streamlit_mic_recorder import speech_to_text # Librería para voz (RF-01)
 
 # ==========================================
 # 1. BASE DE DATOS SQLITE (RF-07 y RNF-01)
@@ -81,47 +81,41 @@ with st.sidebar:
     st.header("🕒 Historial de Consultas")
     st.caption("Haz clic en una conversación para verla completa en la pantalla principal.")
     
-    # Botón para limpiar la pantalla y empezar de cero
     if st.button("➕ Nueva Consulta", type="primary", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
         
     st.divider()
     
-    # Extraemos las preguntas de la base de datos
     c.execute("SELECT pregunta, respuesta FROM logs_auditoria ORDER BY id DESC")
     historial_db = c.fetchall()
     
-    # Creamos un botón por cada consulta pasada
     for i, (preg, resp) in enumerate(historial_db):
         titulo = preg[:30] + "..." if len(preg) > 30 else preg
         
-        # Si el usuario hace clic en un botón del historial...
         if st.button(f"🗣️ {titulo}", key=f"hist_{i}", use_container_width=True):
-            # ...cargamos ESA conversación específica en el centro de la pantalla
             st.session_state.messages = [
                 {"role": "user", "content": preg},
                 {"role": "assistant", "content": resp}
             ]
 
-# CSS Mágico para transformar la barra de chat al estilo Gemini
+# --- CSS HACK EXTREMO PARA EL MICRÓFONO Y LA BARRA ---
 st.markdown(
     """
     <style>
-    /* 1. Transformar la caja de texto en una "píldora" */
+    /* 1. Transformar la caja de texto en una píldora */
     div[data-testid="stChatInput"] {
-        padding-bottom: 20px;
+        padding-bottom: 20px !important;
     }
     div[data-testid="stChatInput"] textarea {
         border-radius: 30px !important; 
-        padding-right: 100px !important; /* Espacio grande para el micro y la flecha */
+        padding-right: 90px !important; /* Hueco reservado para iconos */
         padding-left: 20px !important;
-        background-color: transparent !important;
     }
     
-    /* 2. Transformar el botón de enviar nativo en un círculo azul con flecha blanca */
+    /* 2. Botón de enviar (Círculo azul) */
     div[data-testid="stChatInput"] button {
-        background-color: #1a73e8 !important; /* Color azul estilo Gemini/Google */
+        background-color: #1a73e8 !important; 
         border-radius: 50% !important;
         height: 38px !important;
         width: 38px !important;
@@ -138,30 +132,36 @@ st.markdown(
         color: white !important;
     }
 
-    /* 3. Posicionar el micrófono ADENTRO de la barra, a la izquierda del botón azul */
+    /* 3. EL HACK DEFINITIVO PARA EL MICRÓFONO */
     div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-        position: fixed;
-        bottom: 42px; /* <-- ¡AUMENTAMOS ESTO! Sube el micrófono al centro de la barra */
-        z-index: 999;
-        width: 38px !important; 
-        height: 38px !important;
-        border-radius: 50% !important; /* <-- ¡MAGIA! Corta las esquinas cuadradas feas */
-        overflow: hidden !important; /* <-- Desaparece el fondo oscuro original */
-        background-color: transparent !important;
+        position: fixed !important;
+        bottom: 50px !important; /* <--- ELEVACIÓN FORZADA AL CENTRO DE LA BARRA */
+        z-index: 99999 !important;
+        width: 35px !important; 
+        height: 35px !important;
+        background-color: transparent !important; /* <--- ELIMINA EL FONDO FEO */
+        border: none !important;
         box-shadow: none !important;
+        border-radius: 50% !important;
+        overflow: hidden !important;
     }
     
-    /* Ajuste responsivo para Móviles */
+    /* Forzar transparencia interna del componente */
+    div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) iframe {
+        background-color: transparent !important;
+    }
+    
+    /* Ajuste en Celulares */
     @media (max-width: 767px) {
         div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-            right: 68px; /* Empujado justo a la izquierda del botón de enviar */
+            right: 65px !important; /* Justo al lado de la flecha azul */
         }
     }
     
-    /* Ajuste para Laptops/Monitores (Layout Centrado de Streamlit) */
+    /* Ajuste en Computadoras */
     @media (min-width: 768px) {
         div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-            right: calc(50vw - 295px); /* Mantiene el micro siempre a la izquierda de la flecha azul */
+            right: calc(50vw - 295px) !important; /* Anclado dentro de la caja de 730px */
         }
     }
     </style>
@@ -169,7 +169,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Renderizamos el micrófono flotante
+# Renderizamos el micrófono (ahora sin fondo)
 prompt_voz = speech_to_text(
     language='es-ES', 
     use_container_width=False, 
@@ -185,7 +185,6 @@ prompt_voz = speech_to_text(
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Mostrar los mensajes en pantalla
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
@@ -193,7 +192,6 @@ for message in st.session_state.messages:
 # --- ZONA DE ENTRADA NATIVA ---
 prompt_texto = st.chat_input("Escribe tu duda sobre el cultivo...")
 
-# Determinamos si el usuario usó voz o texto
 prompt = prompt_texto or prompt_voz
 
 if prompt:
@@ -205,7 +203,7 @@ if prompt:
         respuesta_cache = buscar_en_cache(prompt)
         
         if respuesta_cache:
-            # Respuesta rápida offline
+            st.success("⚡ Respuesta recuperada desde caché local (Modo Offline)")
             st.markdown(respuesta_cache)
             st.session_state.messages.append({"role": "assistant", "content": respuesta_cache})
             
@@ -248,7 +246,6 @@ if prompt:
 
                     st.markdown(respuesta_ia)
                     
-                    # Guardamos la nueva interacción en el historial continuo
                     guardar_interaccion(prompt, respuesta_ia)
                     st.session_state.messages.append({"role": "assistant", "content": respuesta_ia})
                     
