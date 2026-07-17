@@ -103,10 +103,13 @@ with st.sidebar:
 st.markdown(
     """
     <style>
-    /* 1. Transformar la caja de texto en una píldora */
+    /* 0. Contenedor de la barra como referencia de posicionamiento */
     div[data-testid="stChatInput"] {
+        position: relative !important;
         padding-bottom: 20px !important;
     }
+
+    /* 1. Transformar la caja de texto en una píldora */
     div[data-testid="stChatInput"] textarea {
         border-radius: 30px !important; 
         padding-right: 90px !important; /* Hueco reservado para iconos */
@@ -132,10 +135,11 @@ st.markdown(
         color: white !important;
     }
 
-    /* 3. EL HACK DEFINITIVO PARA EL MICRÓFONO */
+    /* 3. EL HACK DEFINITIVO PARA EL MICRÓFONO: ahora anclado DENTRO de la barra */
     div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-        position: fixed !important;
-        bottom: 50px !important; /* <--- ELEVACIÓN FORZADA AL CENTRO DE LA BARRA */
+        position: absolute !important;
+        bottom: 6px !important; /* alineado con el botón de enviar */
+        right: 54px !important; /* justo a la izquierda del botón azul (38px + 8px margen + 8px hueco) */
         z-index: 99999 !important;
         width: 35px !important; 
         height: 35px !important;
@@ -149,20 +153,6 @@ st.markdown(
     /* Forzar transparencia interna del componente */
     div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) iframe {
         background-color: transparent !important;
-    }
-    
-    /* Ajuste en Celulares */
-    @media (max-width: 767px) {
-        div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-            right: 65px !important; /* Justo al lado de la flecha azul */
-        }
-    }
-    
-    /* Ajuste en Computadoras */
-    @media (min-width: 768px) {
-        div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-            right: calc(50vw - 295px) !important; /* Anclado dentro de la caja de 730px */
-        }
     }
     </style>
     """,
