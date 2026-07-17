@@ -1,6 +1,5 @@
 import streamlit as st
 import os
-import tempfile
 import glob
 import sqlite3
 import datetime
@@ -13,7 +12,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from streamlit_mic_recorder import speech_to_text # Librería para voz (RF-01)
 
 # ==========================================
-# 1. BASE DE DATOS SQLITE (RF-07 y RNF-01)
+# 1. BASE DE DATOS SQLITE (Historial y Caché)
 # ==========================================
 conn = sqlite3.connect('agrobot_cache.db', check_same_thread=False)
 c = conn.cursor()
@@ -38,7 +37,7 @@ def guardar_interaccion(pregunta, respuesta):
     conn.commit()
 
 def cargar_historial():
-    """Recupera el historial completo de la base de datos para mostrarlo en el menú lateral."""
+    """Recupera todas las interacciones previas de la base de datos"""
     c.execute("SELECT pregunta, respuesta FROM logs_auditoria ORDER BY id DESC")
     return c.fetchall()
 
@@ -81,57 +80,87 @@ except KeyError:
 # ==========================================
 st.title("🍌 Agrobot - Plátano")
 
-# --- BARRA LATERAL: HISTORIAL DE CHAT ---
-with st.sidebar:
-    st.header("🕒 Historial de Consultas")
-    st.caption("Tus conversaciones anteriores guardadas en la memoria local.")
+# --- DISEÑO: Botón Flotante (FAB) para el Micrófono ---
+st.markdown(
+    """
+    <style>
+    /* Contenedor flotante para el micrófono */
+    div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
+        position: fixed;
+        bottom: 100px; /* Flota por encima de la barra de chat */
+        right: 20px; /* Esquina inferior derecha en celulares */
+        z-index: 9999;
+        width: 55px !important;
+        height: 55px !important;
+        border-radius: 50%;
+        background-color: #2b2b2b;
+        border: 1px solid #555;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5); /* Sombra 3D */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: transform 0.2s;
+    }
     
-    if st.button("➕ Nueva Consulta (Limpiar Pantalla)", type="primary", use_container_width=True):
-        st.session_state.messages = []
-        st.rerun()
-        
-    st.divider()
-    
-    # Cargar y mostrar historial como botones desplegables
-    historial_db = cargar_historial()
-    
-    for i, (preg, resp) in enumerate(historial_db):
-        titulo = preg[:30] + "..." if len(preg) > 30 else preg
-        
-        with st.expander(f"👤 {titulo}"):
-            st.markdown(f"**Tú:** {preg}")
-            st.markdown(f"**Bot:** {resp}")
-            
-            if st.button("Traer al chat principal", key=f"btn_hist_{i}"):
-                st.session_state.messages = [
-                    {"role": "user", "content": preg},
-                    {"role": "assistant", "content": resp}
-                ]
-                st.rerun()
+    div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]):hover {
+        transform: scale(1.1); /* Efecto zoom al pasar el mouse */
+        background-color: #3b3b3b;
+    }
 
+    /* Ajuste para Laptops/Monitores para que quede alineado visualmente */
+    @media (min-width: 768px) {
+        div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
+            right: calc(50vw - 360px); 
+        }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Inicializar mensajes de la sesión actual
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Imprimimos los mensajes en la pantalla principal
+# --- BARRA LATERAL: HISTORIAL DE CHAT ---
+with st.sidebar:
+    st.header("🕒 Historial de Consultas")
+    
+    # Botón para limpiar la pantalla principal y hacer una nueva pregunta
+    if st.button("➕ Nueva Consulta", use_container_width=True):
+        st.session_state.messages = []
+        st.rerun()
+        
+    st.markdown("---")
+    st.caption("Tus conversaciones guardadas:")
+    
+    historial = cargar_historial()
+    if historial:
+        for preg, resp in historial:
+            # Crea un desplegable por cada pregunta pasada
+            with st.expander(f"👤 {preg[:35]}..."):
+                st.markdown(f"**Tú:** {preg}")
+                st.markdown(f"**Agrobot:** {resp}")
+    else:
+        st.info("Aún no hay consultas guardadas en la base de datos.")
+
+# Imprimimos los mensajes activos en la pantalla principal
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# --- PANEL DE VOZ NATIVO (100% estable y elegante) ---
-st.write("") # Pequeño espacio visual
-col1, col2, col3 = st.columns([1, 2, 1]) # Creamos 3 columnas para centrar el botón
-with col2:
-    prompt_voz = speech_to_text(
-        language='es-ES', 
-        use_container_width=True, 
-        just_once=True, 
-        key='STT',
-        start_prompt="🎙️ Toca aquí para hablar", 
-        stop_prompt="🛑 Detener grabación",
-    )
+# Renderizamos el micrófono (El CSS de arriba lo atrapará y lo hará flotar permanentemente)
+prompt_voz = speech_to_text(
+    language='es-ES', 
+    use_container_width=False, 
+    just_once=True, 
+    key='STT',
+    start_prompt="🎤", 
+    stop_prompt="🛑",
+)
 
 # --- ZONA DE ENTRADA DE TEXTO ---
-prompt_texto = st.chat_input("O escribe tu duda sobre el cultivo...")
+prompt_texto = st.chat_input("Escribe tu duda sobre el cultivo...")
 
 # Determinamos si el usuario usó voz o texto
 prompt = prompt_texto or prompt_voz
