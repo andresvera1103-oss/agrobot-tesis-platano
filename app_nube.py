@@ -101,69 +101,44 @@ with st.sidebar:
                 {"role": "assistant", "content": resp}
             ]
 
-# --- CSS MÁGICO PARA EL DISEÑO DEFINITIVO ---
+# --- CSS PARA EL DISEÑO NORMAL Y MICRÓFONO CUADRADO ---
 st.markdown(
     """
     <style>
-    /* 1. Achicar la barra de texto para dejar un "hueco" a la derecha */
+    /* 1. Barra normal de Streamlit, pero dejamos un "hueco" a la derecha para el microfono */
     div[data-testid="stChatInput"] {
-        padding-bottom: 20px !important;
-        padding-right: 75px !important; /* Espacio reservado para el micrófono */
-    }
-    div[data-testid="stChatInput"] textarea {
-        border-radius: 30px !important; 
-        padding-left: 20px !important;
+        padding-right: 70px !important; 
     }
     
-    /* 2. Botón enviar nativo (Círculo azul con flecha blanca) */
-    div[data-testid="stChatInput"] button {
-        background-color: #1a73e8 !important; 
-        border-radius: 50% !important;
-        height: 38px !important;
-        width: 38px !important;
-        padding: 0 !important;
-        margin-right: 8px !important;
-        margin-bottom: 6px !important;
-        transition: transform 0.2s;
-    }
-    div[data-testid="stChatInput"] button:hover {
-        transform: scale(1.05); 
-    }
-    div[data-testid="stChatInput"] button svg {
-        fill: white !important;
-        color: white !important;
-    }
-
-    /* 3. EL MICRÓFONO POR FUERA DE LA BARRA (Lado Derecho) */
+    /* 2. Micrófono CUADRADO, alineado al centro de la barra */
     div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
         position: fixed !important;
-        bottom: 26px !important; /* Alineado perfectamente a la altura de la barra */
+        bottom: 26px !important; /* Altura perfecta para alinear con la barra normal */
         z-index: 99999 !important;
         width: 42px !important; 
         height: 42px !important;
-        /* Darle aspecto de botón propio flotante */
-        background-color: #2b2c36 !important; /* Fondo gris oscuro */
-        border: 1px solid #4a4b59 !important; /* Borde muy sutil */
-        border-radius: 50% !important; /* 100% redondo */
+        background-color: #2b2c36 !important; /* Fondo gris cuadrado */
+        border: 1px solid #4a4b59 !important; /* Borde sutil estándar */
+        border-radius: 8px !important; /* CUADRADO con esquinas suaves (estilo web moderno) */
         overflow: hidden !important;
     }
-    
-    /* Transparencia interna del componente de micrófono */
+
+    /* Fondo transparente interno para el iframe del botón */
     div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) iframe {
         background-color: transparent !important;
     }
-    
-    /* Ajuste en Celulares */
+
+    /* Ajuste de posición Horizontal para Móviles */
     @media (max-width: 767px) {
         div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-            right: 25px !important; /* Exactamente en el hueco derecho */
+            right: 20px !important; /* Metido justo en el hueco derecho de la pantalla */
         }
     }
     
-    /* Ajuste en Computadoras */
+    /* Ajuste de posición Horizontal para Computadoras (Layout centrado) */
     @media (min-width: 768px) {
         div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-            right: calc(50vw - 365px + 16px) !important; /* Matemáticamente en el hueco derecho del monitor */
+            right: calc(50vw - 365px + 16px) !important; /* Matemáticamente en el hueco derecho de PC */
         }
     }
     </style>
@@ -171,7 +146,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Renderizamos el micrófono (ahora vive afuera, a la derecha)
+# Renderizamos el micrófono (el CSS lo volverá cuadrado y lo ubicará a la derecha)
 prompt_voz = speech_to_text(
     language='es-ES', 
     use_container_width=False, 
