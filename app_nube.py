@@ -141,11 +141,14 @@ st.markdown(
     /* 3. Posicionar el micrófono ADENTRO de la barra, a la izquierda del botón azul */
     div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
         position: fixed;
-        bottom: 31px; /* Alineación perfecta con el botón azul */
+        bottom: 42px; /* <-- ¡AUMENTAMOS ESTO! Sube el micrófono al centro de la barra */
         z-index: 999;
         width: 38px !important; 
         height: 38px !important;
-        border-radius: 50% !important;
+        border-radius: 50% !important; /* <-- ¡MAGIA! Corta las esquinas cuadradas feas */
+        overflow: hidden !important; /* <-- Desaparece el fondo oscuro original */
+        background-color: transparent !important;
+        box-shadow: none !important;
     }
     
     /* Ajuste responsivo para Móviles */
