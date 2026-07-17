@@ -113,7 +113,7 @@ st.markdown(
     /* 2. Micrófono CUADRADO, alineado al centro de la barra */
     div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
         position: fixed !important;
-        bottom: 26px !important; /* Altura perfecta para alinear con la barra normal */
+        bottom: 38px !important; /* <--- AQUÍ ESTÁ LA MAGIA: Subimos el botón para alinearlo perfectamente */
         z-index: 99999 !important;
         width: 42px !important; 
         height: 42px !important;
