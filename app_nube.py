@@ -1,6 +1,5 @@
 import streamlit as st
 import os
-import tempfile
 import glob
 import sqlite3
 import datetime
@@ -10,7 +9,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
-from streamlit_mic_recorder import speech_to_text # Librería para voz (RF-01)
+from streamlit_mic_recorder import speech_to_text
 
 # ==========================================
 # 1. BASE DE DATOS SQLITE (RF-07 y RNF-01)
@@ -18,6 +17,7 @@ from streamlit_mic_recorder import speech_to_text # Librería para voz (RF-01)
 conn = sqlite3.connect('agrobot_cache.db', check_same_thread=False)
 c = conn.cursor()
 
+# Tablas para modo offline y auditoría/historial
 c.execute('''CREATE TABLE IF NOT EXISTS cache_offline
              (pregunta TEXT PRIMARY KEY, respuesta TEXT)''')
 c.execute('''CREATE TABLE IF NOT EXISTS logs_auditoria
@@ -25,17 +25,29 @@ c.execute('''CREATE TABLE IF NOT EXISTS logs_auditoria
 conn.commit()
 
 def buscar_en_cache(pregunta):
+    """Busca si la pregunta ya se hizo antes para responder al instante (Offline)."""
     c.execute("SELECT respuesta FROM cache_offline WHERE pregunta=?", (pregunta.lower().strip(),))
     resultado = c.fetchone()
     return resultado[0] if resultado else None
 
 def guardar_interaccion(pregunta, respuesta):
+    """Guarda la pregunta y respuesta en caché y en el historial de la DB."""
     fecha_actual = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     c.execute("INSERT INTO logs_auditoria (fecha, pregunta, respuesta) VALUES (?, ?, ?)", 
               (fecha_actual, pregunta, respuesta))
     c.execute("INSERT OR IGNORE INTO cache_offline (pregunta, respuesta) VALUES (?, ?)", 
               (pregunta.lower().strip(), respuesta))
     conn.commit()
+
+def cargar_historial():
+    """Recupera toda la conversación pasada desde la base de datos para mostrarla en pantalla."""
+    c.execute("SELECT pregunta, respuesta FROM logs_auditoria ORDER BY id ASC")
+    filas = c.fetchall()
+    historial = []
+    for pregunta, respuesta in filas:
+        historial.append({"role": "user", "content": pregunta})
+        historial.append({"role": "assistant", "content": respuesta})
+    return historial
 
 # ==========================================
 # 2. CONFIGURACIÓN E INTERFAZ
@@ -44,6 +56,7 @@ st.set_page_config(page_title="Agrobot Plátano", page_icon="🍌", layout="cent
 
 @st.cache_resource
 def cargar_modelo_embeddings():
+    """Carga el modelo de vectores en memoria caché para mayor velocidad."""
     return HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
 embeddings = cargar_modelo_embeddings()
@@ -52,7 +65,7 @@ if "vectorstore" not in st.session_state:
     st.session_state.vectorstore = None
     st.session_state.documentos_cargados = False
 
-# Carga de documentos en backend
+# Carga de documentos en backend (Carpeta "documentos" en GitHub)
 if not st.session_state.documentos_cargados and os.path.exists("documentos"):
     archivos = glob.glob("documentos/*.pdf")
     if archivos:
@@ -66,15 +79,15 @@ if not st.session_state.documentos_cargados and os.path.exists("documentos"):
             st.session_state.vectorstore = FAISS.from_documents(splits, embeddings)
             st.session_state.documentos_cargados = True
 
+# Obtener API Key de los secretos de Streamlit Cloud
 try:
     api_key = st.secrets["GROQ_API_KEY"]
 except KeyError:
     api_key = None 
 
 # ==========================================
-# 3. INTERFAZ GRÁFICA PRINCIPAL
+# 3. INTERFAZ GRÁFICA PRINCIPAL Y CSS
 # ==========================================
-# Título exacto como en la imagen
 st.title("🍌 Agrobot - Plátano")
 
 # CSS Mágico para transformar la barra de chat al estilo Gemini
@@ -86,7 +99,7 @@ st.markdown(
         padding-bottom: 20px;
     }
     div[data-testid="stChatInput"] textarea {
-        border-radius: 30px !important; /* Forma de píldora */
+        border-radius: 30px !important; 
         padding-right: 90px !important; /* Espacio reservado para el micro y la flecha */
         padding-left: 20px !important;
     }
@@ -138,7 +151,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Renderizamos el micrófono compacto (el CSS de arriba lo moverá visualmente adentro de la barra)
+# Renderizamos el micrófono (el CSS de arriba lo moverá visualmente adentro de la barra)
 prompt_voz = speech_to_text(
     language='es-ES', 
     use_container_width=False, 
@@ -148,29 +161,34 @@ prompt_voz = speech_to_text(
     stop_prompt="🛑",
 )
 
+# Cargar historial desde la Base de Datos al iniciar
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = cargar_historial()
 
+# Mostrar mensajes anteriores
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# --- ZONA DE ENTRADA NATIVA (Idéntica a la imagen, el micrófono flotará sobre ella) ---
+# Zona de entrada de texto nativa (La píldora)
 prompt_texto = st.chat_input("Escribe tu duda sobre el cultivo...")
 
 # Determinamos si el usuario usó voz o texto
 prompt = prompt_texto or prompt_voz
 
 if prompt:
+    # 1. Mostrar el mensaje del usuario
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
+    # 2. Generar y mostrar la respuesta de la IA
     with st.chat_message("assistant"):
+        # Buscar en SQLite primero
         respuesta_cache = buscar_en_cache(prompt)
         
         if respuesta_cache:
-            st.success("⚡ Respuesta recuperada desde caché local (Modo Offline)")
+            st.success("⚡ Respuesta recuperada desde memoria caché (Modo Offline)")
             st.markdown(respuesta_cache)
             st.session_state.messages.append({"role": "assistant", "content": respuesta_cache})
             
@@ -182,11 +200,13 @@ if prompt:
             with st.spinner("Analizando..."):
                 try:
                     contexto = ""
+                    # Buscar en FAISS (PDFs)
                     if st.session_state.documentos_cargados and st.session_state.vectorstore is not None:
                         retriever = st.session_state.vectorstore.as_retriever(search_kwargs={"k": 3})
                         docs_relevantes = retriever.invoke(prompt)
                         contexto = "\n\n".join(doc.page_content for doc in docs_relevantes)
 
+                    # Configurar LLM (Groq)
                     llm = ChatGroq(
                         groq_api_key=api_key, 
                         model_name="llama-3.1-8b-instant", 
@@ -200,10 +220,10 @@ if prompt:
                         {context}
 
                         REGLAS ESTRICTAS PARA RESPONDER:
-                        1. RESPONDE DIRECTAMENTE A LA PREGUNTA. Tienes PROHIBIDO saludar.
+                        1. RESPONDE DIRECTAMENTE A LA PREGUNTA. Tienes PROHIBIDO saludar o hacer preguntas de cierre.
                         2. Prioriza SIEMPRE la información del Contexto.
-                        3. (RF-06) Si la pregunta es muy compleja o tu certeza es baja, SÚGIERE al final consultar físicamente a un técnico agrícola local.
-                        4. (RNF-06) Confiabilidad: Si tu respuesta menciona el uso de pesticidas, fungicidas o cualquier agroquímico, DEBES incluir una advertencia de seguridad sobre el uso de equipo de protección personal.
+                        3. (RF-06) Si la pregunta es muy compleja o tu certeza es baja, SUGIERE al final consultar físicamente a un técnico agrícola local.
+                        4. (RNF-06) Confiabilidad: Si tu respuesta menciona el uso de pesticidas, fungicidas o agroquímicos, DEBES incluir una advertencia de seguridad sobre el equipo de protección.
                         """),
                         ("user", "{question}")
                     ])
@@ -213,6 +233,7 @@ if prompt:
 
                     st.markdown(respuesta_ia)
                     
+                    # Guardar permanentemente en la DB SQLite
                     guardar_interaccion(prompt, respuesta_ia)
                     st.session_state.messages.append({"role": "assistant", "content": respuesta_ia})
                     
