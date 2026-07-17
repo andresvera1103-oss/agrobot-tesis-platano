@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import os
 import tempfile
 import glob
@@ -103,9 +104,8 @@ with st.sidebar:
 st.markdown(
     """
     <style>
-    /* 0. Contenedor de la barra como referencia de posicionamiento */
+    /* 0. Contenedor de la barra */
     div[data-testid="stChatInput"] {
-        position: relative !important;
         padding-bottom: 20px !important;
     }
 
@@ -135,23 +135,24 @@ st.markdown(
         color: white !important;
     }
 
-    /* 3. EL HACK DEFINITIVO PARA EL MICRÓFONO: ahora anclado DENTRO de la barra */
+    /* 3. El micrófono como icono cuadrado redondeado, al lado del botón de enviar */
     div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-        position: absolute !important;
-        bottom: 6px !important; /* alineado con el botón de enviar */
-        right: 54px !important; /* justo a la izquierda del botón azul (38px + 8px margen + 8px hueco) */
-        z-index: 99999 !important;
-        width: 35px !important; 
-        height: 35px !important;
-        background-color: transparent !important; /* <--- ELIMINA EL FONDO FEO */
-        border: none !important;
-        box-shadow: none !important;
-        border-radius: 50% !important;
+        width: 38px !important;
+        height: 38px !important;
+        min-width: 38px !important;
+        flex: 0 0 38px !important;
+        background-color: #30333a !important;
+        border-radius: 10px !important;
+        margin: 0 6px 6px 0 !important;
         overflow: hidden !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
-    
-    /* Forzar transparencia interna del componente */
+
     div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) iframe {
+        width: 100% !important;
+        height: 100% !important;
         background-color: transparent !important;
     }
     </style>
@@ -159,7 +160,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Renderizamos el micrófono (ahora sin fondo)
+# Renderizamos el micrófono (el estilo lo pone el CSS de arriba)
 prompt_voz = speech_to_text(
     language='es-ES', 
     use_container_width=False, 
@@ -167,6 +168,27 @@ prompt_voz = speech_to_text(
     key='STT',
     start_prompt="🎤", 
     stop_prompt="🛑",
+)
+
+# --- SCRIPT: mueve físicamente el ícono del micrófono DENTRO de la barra de chat,
+# justo antes del botón de enviar, para que quede en el mismo renglón. ---
+components.html(
+    """
+    <script>
+    function moverMicrofono() {
+        const doc = window.parent.document;
+        const boton = doc.querySelector('div[data-testid="stChatInput"] button');
+        const micContainer = doc.querySelector(
+            'div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"])'
+        );
+        if (boton && micContainer && micContainer.nextElementSibling !== boton) {
+            boton.parentElement.insertBefore(micContainer, boton);
+        }
+    }
+    setInterval(moverMicrofono, 300);
+    </script>
+    """,
+    height=0,
 )
 
 # ==========================================
