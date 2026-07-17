@@ -84,24 +84,33 @@ st.title("🍌 Agrobot - Plátano")
 st.markdown(
     """
     <style>
-    /* Contenedor flotante para el micrófono - Solo posición, sin fondos extraños */
+    /* Contenedor flotante para el micrófono */
     div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
         position: fixed;
-        bottom: 90px; /* En móviles: más arriba para NO TOCAR la barra */
-        right: 20px;
+        bottom: 100px; /* Flota por encima de la barra de chat */
+        right: 20px; /* Esquina inferior derecha en celulares */
         z-index: 9999;
+        width: 55px !important;
+        height: 55px !important;
+        border-radius: 50%;
+        background-color: #2b2b2b;
+        border: 1px solid #555;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5); /* Sombra 3D */
+        display: flex;
+        justify-content: center;
+        align-items: center;
         transition: transform 0.2s;
     }
     
     div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]):hover {
-        transform: scale(1.05); /* Pequeño efecto zoom al pasar el mouse */
+        transform: scale(1.1); /* Efecto zoom al pasar el mouse */
+        background-color: #3b3b3b;
     }
 
-    /* Ajuste para Laptops/Monitores: Al lado derecho de la barra, totalmente separado */
-    @media (min-width: 850px) {
+    /* Ajuste para Laptops/Monitores para que quede alineado visualmente */
+    @media (min-width: 768px) {
         div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-            bottom: 27px; /* Alineado verticalmente con la barra de texto */
-            right: calc(50vw - 425px); /* Posicionado por fuera de la barra, a la derecha */
+            right: calc(50vw - 360px); 
         }
     }
     </style>
