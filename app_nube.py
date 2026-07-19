@@ -80,37 +80,31 @@ except KeyError:
 # ==========================================
 st.title("🍌 Agrobot - Plátano")
 
-# --- DISEÑO: Botón Flotante (FAB) para el Micrófono ---
+# CSS para el botón del micrófono alineado
 st.markdown(
     """
     <style>
-    /* Contenedor flotante para el micrófono */
-    div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-        position: fixed;
-        bottom: 100px; /* Flota por encima de la barra de chat */
-        right: 20px; /* Esquina inferior derecha en celulares */
-        z-index: 9999;
-        width: 55px !important;
-        height: 55px !important;
-        border-radius: 50%;
-        background-color: #2b2b2b;
-        border: 1px solid #555;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.5); /* Sombra 3D */
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        transition: transform 0.2s;
+    /* Hacemos un espacio a la derecha de la barra para que entre el micro */
+    div[data-testid="stChatInput"] textarea {
+        padding-right: 70px !important;
     }
     
-    div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]):hover {
-        transform: scale(1.1); /* Efecto zoom al pasar el mouse */
-        background-color: #3b3b3b;
+    /* Posicionamos el micrófono como un botón cuadrado redondeado */
+    div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
+        position: fixed;
+        bottom: 38px;
+        right: calc(50vw - 345px); /* Ajuste para que encaje al lado de la barra */
+        z-index: 999;
+        width: 42px !important;
+        height: 42px !important;
+        border-radius: 8px !important;
+        overflow: hidden !important;
     }
-
-    /* Ajuste para Laptops/Monitores para que quede alineado visualmente */
-    @media (min-width: 768px) {
+    
+    /* Ajuste para móviles */
+    @media (max-width: 768px) {
         div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-            right: calc(50vw - 360px); 
+            right: 25px;
         }
     }
     </style>
@@ -122,12 +116,12 @@ st.markdown(
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- BARRA LATERAL: HISTORIAL DE CHAT ---
+# --- BARRA LATERAL: HISTORIAL DE CHAT ESTILO CHATGPT ---
 with st.sidebar:
     st.header("🕒 Historial de Consultas")
     
-    # Botón para limpiar la pantalla principal y hacer una nueva pregunta
-    if st.button("➕ Nueva Consulta", use_container_width=True):
+    # Botón principal para limpiar y empezar de nuevo
+    if st.button("➕ Nueva Consulta", use_container_width=True, type="primary"):
         st.session_state.messages = []
         st.rerun()
         
@@ -136,20 +130,28 @@ with st.sidebar:
     
     historial = cargar_historial()
     if historial:
-        for preg, resp in historial:
-            # Crea un desplegable por cada pregunta pasada
-            with st.expander(f"👤 {preg[:35]}..."):
-                st.markdown(f"**Tú:** {preg}")
-                st.markdown(f"**Agrobot:** {resp}")
+        # Mostramos botones en lugar de texto desplegable
+        for idx, (preg, resp) in enumerate(historial):
+            # Acortar el texto del botón para que no se vea feo si es muy largo
+            titulo_boton = f"💬 {preg[:28]}..." if len(preg) > 28 else f"💬 {preg}"
+            
+            # Si el usuario hace clic en este botón del historial...
+            if st.button(titulo_boton, key=f"hist_{idx}", use_container_width=True):
+                # Cargamos esa conversación en la pantalla principal
+                st.session_state.messages = [
+                    {"role": "user", "content": preg},
+                    {"role": "assistant", "content": resp}
+                ]
+                st.rerun() # Refresca la pantalla para mostrar el chat
     else:
-        st.info("Aún no hay consultas guardadas en la base de datos.")
+        st.info("Aún no hay consultas guardadas.")
 
-# Imprimimos los mensajes activos en la pantalla principal
+# Imprimimos los mensajes en la pantalla principal ancha
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Renderizamos el micrófono (El CSS de arriba lo atrapará y lo hará flotar permanentemente)
+# Renderizamos el micrófono (El CSS de arriba lo atrapará)
 prompt_voz = speech_to_text(
     language='es-ES', 
     use_container_width=False, 
@@ -166,15 +168,19 @@ prompt_texto = st.chat_input("Escribe tu duda sobre el cultivo...")
 prompt = prompt_texto or prompt_voz
 
 if prompt:
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    # Mostramos la pregunta nueva
+    st.session_state.messages = [{"role": "user", "content": prompt}]
+    st.rerun()
 
+# Lógica de respuesta de la IA (solo se activa si el último mensaje es del usuario)
+if len(st.session_state.messages) > 0 and st.session_state.messages[-1]["role"] == "user":
+    ultimo_prompt = st.session_state.messages[-1]["content"]
+    
     with st.chat_message("assistant"):
-        respuesta_cache = buscar_en_cache(prompt)
+        respuesta_cache = buscar_en_cache(ultimo_prompt)
         
         if respuesta_cache:
-            st.success("⚡ Respuesta recuperada desde caché local (Modo Offline)")
+            st.success("⚡ Respuesta recuperada desde caché local")
             st.markdown(respuesta_cache)
             st.session_state.messages.append({"role": "assistant", "content": respuesta_cache})
             
@@ -188,7 +194,7 @@ if prompt:
                     contexto = ""
                     if st.session_state.documentos_cargados and st.session_state.vectorstore is not None:
                         retriever = st.session_state.vectorstore.as_retriever(search_kwargs={"k": 3})
-                        docs_relevantes = retriever.invoke(prompt)
+                        docs_relevantes = retriever.invoke(ultimo_prompt)
                         contexto = "\n\n".join(doc.page_content for doc in docs_relevantes)
 
                     llm = ChatGroq(
@@ -212,12 +218,12 @@ if prompt:
                         ("user", "{question}")
                     ])
                     
-                    mensaje = prompt_template.format_messages(context=contexto, question=prompt)
+                    mensaje = prompt_template.format_messages(context=contexto, question=ultimo_prompt)
                     respuesta_ia = llm.invoke(mensaje).content
 
                     st.markdown(respuesta_ia)
                     
-                    guardar_interaccion(prompt, respuesta_ia)
+                    guardar_interaccion(ultimo_prompt, respuesta_ia)
                     st.session_state.messages.append({"role": "assistant", "content": respuesta_ia})
                     
                 except Exception as e:
