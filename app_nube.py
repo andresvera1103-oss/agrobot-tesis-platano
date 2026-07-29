@@ -80,22 +80,31 @@ except KeyError:
 # ==========================================
 st.title("🍌 Agrobot - Plátano")
 
-# --- DISEÑO: Botón Flotante para el Micrófono (FAB) ---
+# CSS para el botón del micrófono alineado
 st.markdown(
     """
     <style>
-    /* El micrófono será un botón flotante en la esquina inferior derecha */
-    div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-        position: fixed;
-        bottom: 90px;
-        right: calc(50vw - 425px); /* Ajuste en PC */
-        z-index: 999;
+    /* Hacemos un espacio a la derecha de la barra para que entre el micro */
+    div[data-testid="stChatInput"] textarea {
+        padding-right: 60px !important;
     }
     
-    /* Ajuste de posición para teléfonos móviles */
-    @media (max-width: 850px) {
+    /* Posicionamos el micrófono limpio como icono flotante a la derecha */
+    div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
+        position: fixed;
+        bottom: 30px; /* Altura perfecta para alinear */
+        right: calc(50vw - 390px); /* A la derecha de la barra en PC */
+        z-index: 999;
+        /* Quitamos fondos y bordes feos para que sea solo un icono */
+        background: transparent !important; 
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    /* Ajuste para móviles para que flote arriba y no estorbe */
+    @media (max-width: 800px) {
         div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-            right: 25px;
+            right: 15px;
             bottom: 90px;
         }
     }
@@ -111,7 +120,6 @@ if "messages" not in st.session_state:
 # --- BARRA LATERAL: HISTORIAL DE CHAT ESTILO CHATGPT ---
 with st.sidebar:
     st.header("🕒 Historial de Consultas")
-    st.caption("Tus conversaciones anteriores guardadas en la memoria local.")
     
     # Botón principal para limpiar y empezar de nuevo
     if st.button("➕ Nueva Consulta", use_container_width=True, type="primary"):
@@ -119,30 +127,32 @@ with st.sidebar:
         st.rerun()
         
     st.markdown("---")
+    st.caption("Tus conversaciones guardadas:")
     
     historial = cargar_historial()
     if historial:
-        # Creamos un botón para cada chat pasado
+        # Mostramos botones en lugar de texto desplegable
         for idx, (preg, resp) in enumerate(historial):
-            # Acortamos el título del botón para que no se vea desordenado
-            titulo_boton = f"💬 {preg[:25]}..." if len(preg) > 25 else f"💬 {preg}"
+            # Acortar el texto del botón para que no se vea feo si es muy largo
+            titulo_boton = f"💬 {preg[:28]}..." if len(preg) > 28 else f"💬 {preg}"
             
-            # Si el usuario hace clic, esa conversación se va a la pantalla principal
-            if st.button(titulo_boton, key=f"hist_btn_{idx}", use_container_width=True):
+            # Si el usuario hace clic en este botón del historial...
+            if st.button(titulo_boton, key=f"hist_{idx}", use_container_width=True):
+                # Cargamos esa conversación en la pantalla principal
                 st.session_state.messages = [
                     {"role": "user", "content": preg},
                     {"role": "assistant", "content": resp}
                 ]
-                st.rerun()
+                st.rerun() # Refresca la pantalla para mostrar el chat
     else:
-        st.info("Aún no hay consultas.")
+        st.info("Aún no hay consultas guardadas.")
 
 # Imprimimos los mensajes en la pantalla principal ancha
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Renderizamos el micrófono (Flotante)
+# Renderizamos el micrófono (El CSS de arriba lo atrapará)
 prompt_voz = speech_to_text(
     language='es-ES', 
     use_container_width=False, 
@@ -163,7 +173,7 @@ if prompt:
     st.session_state.messages = [{"role": "user", "content": prompt}]
     st.rerun()
 
-# Lógica de respuesta de la IA
+# Lógica de respuesta de la IA (solo se activa si el último mensaje es del usuario)
 if len(st.session_state.messages) > 0 and st.session_state.messages[-1]["role"] == "user":
     ultimo_prompt = st.session_state.messages[-1]["content"]
     
@@ -188,10 +198,10 @@ if len(st.session_state.messages) > 0 and st.session_state.messages[-1]["role"] 
                         docs_relevantes = retriever.invoke(ultimo_prompt)
                         contexto = "\n\n".join(doc.page_content for doc in docs_relevantes)
 
-                    # CAMBIO IMPORTANTE AQUÍ: Pasamos a 'llama3-8b-8192' que no tiene bloqueos.
+                    # CAMBIO AL MODELO SEGURO Y ESTABLE
                     llm = ChatGroq(
                         groq_api_key=api_key, 
-                        model_name="llama3-8b-8192", 
+                        model_name="mixtral-8x7b-32768", 
                         temperature=0.2 
                     )
 
@@ -219,5 +229,5 @@ if len(st.session_state.messages) > 0 and st.session_state.messages[-1]["role"] 
                     st.session_state.messages.append({"role": "assistant", "content": respuesta_ia})
                     
                 except Exception as e:
-                    # CAMBIO AQUÍ: Ocultamos el error feo de la consola y mostramos algo profesional
+                    # MENSAJE DE ERROR LIMPIO PARA LA TESIS (OCULTA EL 403 FEÓ)
                     st.error("⚠️ Hubo un problema de conexión con el servidor de Inteligencia Artificial (Posible saturación). Por favor, intenta de nuevo en unos segundos.")
