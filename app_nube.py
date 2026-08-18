@@ -57,8 +57,9 @@ if "vectorstore" not in st.session_state:
     st.session_state.documentos_cargados = False
 
 # Carga de documentos en backend
-if not st.session_state.documentos_cargados and os.path.exists("documentos"):
-    archivos = glob.glob("documentos/*.pdf")
+carpeta_pdfs = "datos" if os.path.exists("datos") else "documentos"
+if not st.session_state.documentos_cargados and os.path.exists(carpeta_pdfs):
+    archivos = glob.glob(f"{carpeta_pdfs}/*.pdf")
     if archivos:
         docs = []
         for ruta in archivos:
@@ -80,28 +81,25 @@ except KeyError:
 # ==========================================
 st.title("🍌 Agrobot - Plátano")
 
-# CSS para el botón del micrófono alineado
+# --- DISEÑO: Botón Flotante Limpio ---
 st.markdown(
     """
     <style>
-    /* Hacemos un espacio a la derecha de la barra para que entre el micro */
     div[data-testid="stChatInput"] textarea {
         padding-right: 60px !important;
     }
     
-    /* Posicionamos el micrófono limpio como icono flotante a la derecha */
     div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
         position: fixed;
-        bottom: 30px; /* Altura perfecta para alinear */
-        right: calc(50vw - 390px); /* A la derecha de la barra en PC */
+        bottom: 90px;
+        right: calc(50vw - 425px);
         z-index: 999;
-        /* Quitamos fondos y bordes feos para que sea solo un icono */
-        background: transparent !important; 
+        /* Limpiamos cualquier borde o fondo residual */
+        background: transparent !important;
         border: none !important;
         box-shadow: none !important;
     }
     
-    /* Ajuste para móviles para que flote arriba y no estorbe */
     @media (max-width: 800px) {
         div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
             right: 15px;
@@ -121,7 +119,6 @@ if "messages" not in st.session_state:
 with st.sidebar:
     st.header("🕒 Historial de Consultas")
     
-    # Botón principal para limpiar y empezar de nuevo
     if st.button("➕ Nueva Consulta", use_container_width=True, type="primary"):
         st.session_state.messages = []
         st.rerun()
@@ -131,19 +128,15 @@ with st.sidebar:
     
     historial = cargar_historial()
     if historial:
-        # Mostramos botones en lugar de texto desplegable
         for idx, (preg, resp) in enumerate(historial):
-            # Acortar el texto del botón para que no se vea feo si es muy largo
             titulo_boton = f"💬 {preg[:28]}..." if len(preg) > 28 else f"💬 {preg}"
             
-            # Si el usuario hace clic en este botón del historial...
             if st.button(titulo_boton, key=f"hist_{idx}", use_container_width=True):
-                # Cargamos esa conversación en la pantalla principal
                 st.session_state.messages = [
                     {"role": "user", "content": preg},
                     {"role": "assistant", "content": resp}
                 ]
-                st.rerun() # Refresca la pantalla para mostrar el chat
+                st.rerun() 
     else:
         st.info("Aún no hay consultas guardadas.")
 
@@ -152,7 +145,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Renderizamos el micrófono (El CSS de arriba lo atrapará)
+# Renderizamos el micrófono
 prompt_voz = speech_to_text(
     language='es-ES', 
     use_container_width=False, 
@@ -169,11 +162,10 @@ prompt_texto = st.chat_input("Escribe tu duda sobre el cultivo...")
 prompt = prompt_texto or prompt_voz
 
 if prompt:
-    # Mostramos la pregunta nueva
     st.session_state.messages = [{"role": "user", "content": prompt}]
     st.rerun()
 
-# Lógica de respuesta de la IA (solo se activa si el último mensaje es del usuario)
+# Lógica de respuesta de la IA
 if len(st.session_state.messages) > 0 and st.session_state.messages[-1]["role"] == "user":
     ultimo_prompt = st.session_state.messages[-1]["content"]
     
@@ -198,10 +190,10 @@ if len(st.session_state.messages) > 0 and st.session_state.messages[-1]["role"] 
                         docs_relevantes = retriever.invoke(ultimo_prompt)
                         contexto = "\n\n".join(doc.page_content for doc in docs_relevantes)
 
-                    # CAMBIO AL MODELO SEGURO Y ESTABLE
+                    # Modelo activo y disponible en Groq
                     llm = ChatGroq(
                         groq_api_key=api_key, 
-                        model_name="mixtral-8x7b-32768", 
+                        model_name="openai/gpt-oss-20b", 
                         temperature=0.2 
                     )
 
@@ -229,5 +221,5 @@ if len(st.session_state.messages) > 0 and st.session_state.messages[-1]["role"] 
                     st.session_state.messages.append({"role": "assistant", "content": respuesta_ia})
                     
                 except Exception as e:
-                    # MENSAJE DE ERROR LIMPIO PARA LA TESIS (OCULTA EL 403 FEÓ)
-                    st.error("⚠️ Hubo un problema de conexión con el servidor de Inteligencia Artificial (Posible saturación). Por favor, intenta de nuevo en unos segundos.")
+                    st.error(f"Error procesando la solicitud: {str(e)}")
+                    st.error(f"🛑 Error detectado (Por favor cópiame este mensaje): {str(e)}")
