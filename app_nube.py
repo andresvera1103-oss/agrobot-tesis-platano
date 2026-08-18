@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import os
 import glob
 import sqlite3
@@ -81,34 +82,127 @@ except KeyError:
 # ==========================================
 st.title("🍌 Agrobot - Plátano")
 
-# --- DISEÑO: Botón Flotante Limpio ---
+# --- DISEÑO: Barra de Chat Integrada con Micrófono ---
 st.markdown(
     """
     <style>
-    div[data-testid="stChatInput"] textarea {
-        padding-right: 60px !important;
+    /* 1. Espaciado inferior para evitar que la barra se corte contra el borde */
+    div[data-testid="stBottom"] {
+        padding-bottom: 24px !important;
+        background: transparent !important;
     }
     
+    div[data-testid="stBottom"] > div {
+        background: transparent !important;
+    }
+
+    /* 2. Barra de entrada de texto estilo moderno, bordes redondeados y sombra */
+    div[data-testid="stChatInput"] {
+        border-radius: 28px !important;
+        border: 1px solid rgba(255, 255, 255, 0.18) !important;
+        background-color: #1e2229 !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+        position: relative !important;
+        padding: 4px 6px !important;
+    }
+
+    /* 3. Margen derecho en textarea para que el texto nunca tape los botones */
+    div[data-testid="stChatInput"] textarea {
+        padding-right: 92px !important;
+        font-size: 15px !important;
+        color: #f0f2f6 !important;
+    }
+
+    /* 4. Botón de Enviar redondo azul moderno */
+    button[data-testid="stChatInputSubmitButton"] {
+        border-radius: 50% !important;
+        background: #0084ff !important;
+        color: white !important;
+        width: 36px !important;
+        height: 36px !important;
+        border: none !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        position: absolute !important;
+        right: 8px !important;
+        bottom: 7px !important;
+        transition: transform 0.15s ease, background 0.15s ease !important;
+    }
+    
+    button[data-testid="stChatInputSubmitButton"]:hover {
+        background: #0070d8 !important;
+        transform: scale(1.06) !important;
+    }
+
+    /* 5. Contenedor del micrófono alineado justo al lado del botón de enviar */
     div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
         position: fixed;
-        bottom: 90px;
-        right: calc(50vw - 425px);
-        z-index: 999;
-        /* Limpiamos cualquier borde o fondo residual */
+        bottom: 31px;
+        right: calc(50vw - 318px);
+        z-index: 1000;
+        width: 36px !important;
+        height: 36px !important;
+        margin: 0 !important;
+        padding: 0 !important;
         background: transparent !important;
         border: none !important;
-        box-shadow: none !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
-    
-    @media (max-width: 800px) {
+
+    div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) iframe {
+        width: 36px !important;
+        height: 36px !important;
+        border: none !important;
+        background: transparent !important;
+        overflow: hidden !important;
+    }
+
+    /* Ajuste para pantallas móviles */
+    @media (max-width: 768px) {
         div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"]) {
-            right: 15px;
-            bottom: 90px;
+            right: 62px !important;
+            bottom: 31px !important;
         }
     }
     </style>
     """,
     unsafe_allow_html=True
+)
+
+# Script para acoplar el micrófono dentro de la barra de chat de forma nativa
+components.html(
+    """
+    <script>
+    function acoplarMicrofono() {
+        try {
+            const parentDoc = window.parent.document;
+            const micDiv = parentDoc.querySelector('div[data-testid="stElementContainer"]:has(iframe[title*="streamlit_mic_recorder"])');
+            const chatInput = parentDoc.querySelector('div[data-testid="stChatInput"]');
+            
+            if (micDiv && chatInput) {
+                micDiv.style.position = 'absolute';
+                micDiv.style.bottom = '7px';
+                micDiv.style.right = '48px';
+                micDiv.style.zIndex = '100';
+                micDiv.style.width = '36px';
+                micDiv.style.height = '36px';
+                micDiv.style.margin = '0';
+                micDiv.style.padding = '0';
+                
+                if (micDiv.parentElement !== chatInput) {
+                    chatInput.appendChild(micDiv);
+                }
+            }
+        } catch(e) {}
+    }
+    setInterval(acoplarMicrofono, 350);
+    </script>
+    """,
+    height=0,
+    width=0
 )
 
 # Inicializar mensajes de la sesión actual
@@ -145,13 +239,13 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Renderizamos el micrófono
+# Renderizamos el micrófono (RF-01)
 prompt_voz = speech_to_text(
     language='es-ES', 
     use_container_width=False, 
     just_once=True, 
     key='STT',
-    start_prompt="🎤", 
+    start_prompt="🎙️", 
     stop_prompt="🛑",
 )
 
